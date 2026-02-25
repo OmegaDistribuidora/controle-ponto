@@ -3,6 +3,8 @@ import AppShell from "../components/AppShell";
 import api from "../api";
 import { formatDateBr, formatDateTimeBr, resolveMediaUrl, statusClass, statusLabel } from "../utils";
 
+const pendingPollMs = Math.max(5000, Number(import.meta.env.VITE_PENDING_POLL_MS || 15000));
+
 const toQuery = (filters) => {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
@@ -88,9 +90,17 @@ const HrDashboard = () => {
 
     const intervalId = window.setInterval(() => {
       loadPending({ notify: true }).catch(() => null);
-    }, 60 * 1000);
+    }, pendingPollMs);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        loadPending({ notify: true }).catch(() => null);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
+      document.removeEventListener("visibilitychange", onVisible);
       window.clearInterval(intervalId);
     };
   }, []);
