@@ -26,6 +26,14 @@ const getReportDateRange = (query) => {
   };
 };
 
+const parseCoordinate = (value, { min, max, label }) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    return { ok: false, error: `${label} invalida.` };
+  }
+  return { ok: true, value: parsed };
+};
+
 const buildRecordFilter = ({ query, includePendingOnly = false }) => {
   const where = [];
   const values = [];
@@ -60,7 +68,9 @@ const buildRecordFilter = ({ query, includePendingOnly = false }) => {
 
 const fetchLookups = async () => {
   const [sectors, positions, companies] = await Promise.all([
-    pool.query("SELECT id, name, entry_time, exit_time FROM sectors ORDER BY name ASC"),
+    pool.query(
+      "SELECT id, name, entry_time, exit_time, latitude, longitude FROM sectors ORDER BY name ASC"
+    ),
     pool.query("SELECT id, name FROM positions ORDER BY name ASC"),
     pool.query("SELECT id, name FROM companies ORDER BY name ASC")
   ]);
@@ -313,7 +323,9 @@ router.patch("/records/:id/decision", async (req, res) => {
 });
 
 router.get("/sectors", async (_req, res) => {
-  const result = await pool.query("SELECT id, name, entry_time, exit_time FROM sectors ORDER BY name ASC");
+  const result = await pool.query(
+    "SELECT id, name, entry_time, exit_time, latitude, longitude FROM sectors ORDER BY name ASC"
+  );
   return res.json({ items: result.rows });
 });
 
@@ -322,16 +334,30 @@ router.post("/sectors", async (req, res) => {
     const name = String(req.body?.name || "").trim();
     const entryTime = String(req.body?.entryTime || "").trim();
     const exitTime = String(req.body?.exitTime || "").trim();
+    const latitude = parseCoordinate(req.body?.latitude, {
+      min: -90,
+      max: 90,
+      label: "Latitude"
+    });
+    const longitude = parseCoordinate(req.body?.longitude, {
+      min: -180,
+      max: 180,
+      label: "Longitude"
+    });
     if (!name || !entryTime || !exitTime) {
-      return res.status(400).json({ error: "Nome, horario de entrada e saida sao obrigatorios." });
+      return res
+        .status(400)
+        .json({ error: "Nome, horario de entrada, saida, latitude e longitude sao obrigatorios." });
     }
+    if (!latitude.ok) return res.status(400).json({ error: latitude.error });
+    if (!longitude.ok) return res.status(400).json({ error: longitude.error });
     const result = await pool.query(
       `
-        INSERT INTO sectors (name, entry_time, exit_time)
-        VALUES ($1, $2, $3)
-        RETURNING id, name, entry_time, exit_time
+        INSERT INTO sectors (name, entry_time, exit_time, latitude, longitude)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, name, entry_time, exit_time, latitude, longitude
       `,
-      [name, entryTime, exitTime]
+      [name, entryTime, exitTime, latitude.value, longitude.value]
     );
     return res.status(201).json({ item: result.rows[0] });
   } catch (error) {
@@ -348,14 +374,31 @@ router.put("/sectors/:id", async (req, res) => {
     const name = String(req.body?.name || "").trim();
     const entryTime = String(req.body?.entryTime || "").trim();
     const exitTime = String(req.body?.exitTime || "").trim();
+    const latitude = parseCoordinate(req.body?.latitude, {
+      min: -90,
+      max: 90,
+      label: "Latitude"
+    });
+    const longitude = parseCoordinate(req.body?.longitude, {
+      min: -180,
+      max: 180,
+      label: "Longitude"
+    });
+    if (!id || !name || !entryTime || !exitTime) {
+      return res
+        .status(400)
+        .json({ error: "Nome, horario de entrada, saida, latitude e longitude sao obrigatorios." });
+    }
+    if (!latitude.ok) return res.status(400).json({ error: latitude.error });
+    if (!longitude.ok) return res.status(400).json({ error: longitude.error });
     const result = await pool.query(
       `
         UPDATE sectors
-        SET name = $1, entry_time = $2, exit_time = $3
-        WHERE id = $4
-        RETURNING id, name, entry_time, exit_time
+        SET name = $1, entry_time = $2, exit_time = $3, latitude = $4, longitude = $5
+        WHERE id = $6
+        RETURNING id, name, entry_time, exit_time, latitude, longitude
       `,
-      [name, entryTime, exitTime, id]
+      [name, entryTime, exitTime, latitude.value, longitude.value, id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: "Setor nao encontrado." });
     return res.json({ item: result.rows[0] });

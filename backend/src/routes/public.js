@@ -7,12 +7,33 @@ const { isCpfLike, onlyDigits } = require("../utils");
 
 const router = express.Router();
 
+const EARTH_RADIUS_METERS = 6371000;
+
+const distanceMeters = ({ fromLat, fromLon, toLat, toLon }) => {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const dLat = toRad(toLat - fromLat);
+  const dLon = toRad(toLon - fromLon);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(fromLat)) * Math.cos(toRad(toLat)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return EARTH_RADIUS_METERS * c;
+};
+
 router.post("/punch", async (req, res) => {
   try {
     const cpf = onlyDigits(req.body?.cpf);
     const imageBase64 = String(req.body?.imageBase64 || "");
+    const latitude = Number(req.body?.latitude);
+    const longitude = Number(req.body?.longitude);
     if (!isCpfLike(cpf)) return res.status(400).json({ error: "CPF invalido." });
     if (!imageBase64) return res.status(400).json({ error: "Foto obrigatoria para registrar ponto." });
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.status(400).json({ error: "Localizacao obrigatoria para registrar ponto." });
+    }
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      return res.status(400).json({ error: "Coordenadas de localizacao invalidas." });
+    }
 
     const userResult = await pool.query(
       `
@@ -25,7 +46,9 @@ router.post("/punch", async (req, res) => {
           s.id AS sector_id,
           s.name AS sector_name,
           s.entry_time,
-          s.exit_time
+          s.exit_time,
+          s.latitude AS sector_latitude,
+          s.longitude AS sector_longitude
         FROM users u
         LEFT JOIN sectors s ON s.id = u.sector_id
         WHERE u.cpf = $1
@@ -41,6 +64,25 @@ router.post("/punch", async (req, res) => {
     }
     if (!user.sector_id) {
       return res.status(400).json({ error: "Usuario sem setor vinculado. Procure o RH." });
+    }
+    if (!Number.isFinite(Number(user.sector_latitude)) || !Number.isFinite(Number(user.sector_longitude))) {
+      return res
+        .status(400)
+        .json({ error: "Setor sem coordenadas de localizacao. Procure o RH para configurar." });
+    }
+
+    const sectorDistance = distanceMeters({
+      fromLat: latitude,
+      fromLon: longitude,
+      toLat: Number(user.sector_latitude),
+      toLon: Number(user.sector_longitude)
+    });
+    if (sectorDistance > config.maxPunchDistanceMeters) {
+      return res.status(403).json({
+        error: `Fora da area permitida para este setor. Distancia atual: ${Math.round(
+          sectorDistance
+        )}m (limite ${config.maxPunchDistanceMeters}m).`
+      });
     }
 
     const now = nowInFortaleza();

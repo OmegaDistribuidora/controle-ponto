@@ -24,7 +24,9 @@ const defaultEditSector = {
   id: null,
   name: "",
   entryTime: "",
-  exitTime: ""
+  exitTime: "",
+  latitude: "",
+  longitude: ""
 };
 
 const defaultEditPosition = {
@@ -51,7 +53,13 @@ const HrCadastrosPage = () => {
     positionId: "",
     companyId: ""
   });
-  const [newSector, setNewSector] = useState({ name: "", entryTime: "", exitTime: "" });
+  const [newSector, setNewSector] = useState({
+    name: "",
+    entryTime: "",
+    exitTime: "",
+    latitude: "",
+    longitude: ""
+  });
   const [newPosition, setNewPosition] = useState({ name: "" });
   const [newCompany, setNewCompany] = useState({ name: "" });
   const [modalType, setModalType] = useState("");
@@ -177,7 +185,7 @@ const HrCadastrosPage = () => {
     event.preventDefault();
     try {
       await api.post("/hr/sectors", newSector);
-      setNewSector({ name: "", entryTime: "", exitTime: "" });
+      setNewSector({ name: "", entryTime: "", exitTime: "", latitude: "", longitude: "" });
       await loadLookups();
     } catch (err) {
       setError(err.response?.data?.error || "Erro ao criar setor.");
@@ -189,7 +197,9 @@ const HrCadastrosPage = () => {
       id: sector.id,
       name: sector.name,
       entryTime: sector.entry_time?.slice(0, 5) || "",
-      exitTime: sector.exit_time?.slice(0, 5) || ""
+      exitTime: sector.exit_time?.slice(0, 5) || "",
+      latitude: sector.latitude === null || sector.latitude === undefined ? "" : String(sector.latitude),
+      longitude: sector.longitude === null || sector.longitude === undefined ? "" : String(sector.longitude)
     });
     setModalType("sector");
   };
@@ -201,7 +211,9 @@ const HrCadastrosPage = () => {
       await api.put(`/hr/sectors/${editSector.id}`, {
         name: editSector.name,
         entryTime: editSector.entryTime,
-        exitTime: editSector.exitTime
+        exitTime: editSector.exitTime,
+        latitude: editSector.latitude,
+        longitude: editSector.longitude
       });
       await loadLookups();
       closeModal();
@@ -464,6 +476,28 @@ const HrCadastrosPage = () => {
                 required
               />
             </label>
+            <label>
+              Latitude
+              <input
+                type="number"
+                inputMode="decimal"
+                step="any"
+                value={newSector.latitude}
+                onChange={(e) => setNewSector((prev) => ({ ...prev, latitude: e.target.value }))}
+                required
+              />
+            </label>
+            <label>
+              Longitude
+              <input
+                type="number"
+                inputMode="decimal"
+                step="any"
+                value={newSector.longitude}
+                onChange={(e) => setNewSector((prev) => ({ ...prev, longitude: e.target.value }))}
+                required
+              />
+            </label>
             <button type="submit">Criar setor</button>
           </form>
 
@@ -471,7 +505,8 @@ const HrCadastrosPage = () => {
             {lookups.sectors.map((item) => (
               <div key={item.id} className="list-row">
                 <span>
-                  {item.name} ({item.entry_time?.slice(0, 5)}-{item.exit_time?.slice(0, 5)})
+                  {item.name} ({item.entry_time?.slice(0, 5)}-{item.exit_time?.slice(0, 5)}) | lat:{" "}
+                  {item.latitude ?? "-"} | lon: {item.longitude ?? "-"}
                 </span>
                 <div className="row-actions">
                   <button type="button" onClick={() => openEditSector(item)}>
@@ -639,12 +674,34 @@ const HrCadastrosPage = () => {
                     required
                   />
                 </label>
-            <label>
-              Saída (HH:MM)
+                <label>
+                  Saida (HH:MM)
                   <input
                     type="time"
                     value={editSector.exitTime}
                     onChange={(e) => setEditSector((prev) => ({ ...prev, exitTime: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Latitude
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    value={editSector.latitude}
+                    onChange={(e) => setEditSector((prev) => ({ ...prev, latitude: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Longitude
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    value={editSector.longitude}
+                    onChange={(e) => setEditSector((prev) => ({ ...prev, longitude: e.target.value }))}
                     required
                   />
                 </label>

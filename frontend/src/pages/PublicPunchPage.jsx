@@ -13,6 +13,27 @@ const captureFrame = (video) => {
   return canvas.toDataURL("image/jpeg", 0.9);
 };
 
+const getCurrentLocation = () =>
+  new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Seu navegador nao suporta geolocalizacao."));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) =>
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        }),
+      () => reject(new Error("Permita o acesso a localizacao para registrar ponto.")),
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  });
+
 const PublicPunchPage = () => {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -23,6 +44,7 @@ const PublicPunchPage = () => {
   const [messageStatus, setMessageStatus] = useState("");
   const [previewImage, setPreviewImage] = useState("");
   const [cameraReady, setCameraReady] = useState(false);
+  const [locationReady, setLocationReady] = useState(false);
 
   const attachStreamToVideo = async (stream) => {
     if (!videoRef.current) return;
@@ -80,6 +102,13 @@ const PublicPunchPage = () => {
 
   useEffect(() => {
     startCamera({ showError: true });
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        () => setLocationReady(true),
+        () => setLocationReady(false),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
 
     const onVisible = () => {
       if (document.visibilityState === "visible") {
@@ -121,8 +150,18 @@ const PublicPunchPage = () => {
 
     try {
       setLoading(true);
+      let location;
+      try {
+        location = await getCurrentLocation();
+        setLocationReady(true);
+      } catch (geoError) {
+        setLocationReady(false);
+        setMessage(geoError.message || "Permita o acesso a localizacao para registrar ponto.");
+        setMessageStatus("NEGADO");
+        return;
+      }
       const imageBase64 = captureFrame(videoRef.current);
-      const { data } = await api.post("/public/punch", { cpf: cleanCpf, imageBase64 });
+      const { data } = await api.post("/public/punch", { cpf: cleanCpf, imageBase64, ...location });
       setPreviewImage(imageBase64);
       setMessage(data.message);
       setMessageStatus(data.record?.status || "CONFIRMADO");
@@ -156,6 +195,7 @@ const PublicPunchPage = () => {
         </form>
         <p className="muted small">Digite o CPF e pressione Enter.</p>
         <p className="muted small">{cameraReady ? "Camera ativa." : "Aguardando permissao da camera..."}</p>
+        <p className="muted small">{locationReady ? "Localizacao ativa." : "Localizacao sera solicitada ao registrar."}</p>
         {message ? <p className={`feedback ${statusClass(messageStatus)}`}>{message}</p> : null}
         <div className="nav-links">
           <Link to="/login">Entrar no sistema</Link>

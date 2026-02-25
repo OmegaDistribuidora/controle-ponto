@@ -85,9 +85,14 @@ const initDb = async () => {
       name TEXT UNIQUE NOT NULL,
       entry_time TIME NOT NULL,
       exit_time TIME NOT NULL,
+      latitude DOUBLE PRECISION,
+      longitude DOUBLE PRECISION,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+
+  await pool.query("ALTER TABLE sectors ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION");
+  await pool.query("ALTER TABLE sectors ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION");
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -126,10 +131,10 @@ const initDb = async () => {
   `);
 
   await pool.query(`
-    INSERT INTO sectors (name, entry_time, exit_time)
+    INSERT INTO sectors (name, entry_time, exit_time, latitude, longitude)
     VALUES
-      ('Licitacao - Barroso', '07:30', '17:30'),
-      ('Administrativo - Barroso', '08:00', '18:00')
+      ('Licitacao - Barroso', '07:30', '17:30', NULL, NULL),
+      ('Administrativo - Barroso', '08:00', '18:00', NULL, NULL)
     ON CONFLICT (name) DO UPDATE
     SET
       entry_time = EXCLUDED.entry_time,

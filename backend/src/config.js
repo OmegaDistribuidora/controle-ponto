@@ -21,6 +21,7 @@ const config = {
   jwtSecret: process.env.JWT_SECRET || "change-me-in-production",
   timezone: "America/Fortaleza",
   toleranceMinutes: Number(process.env.PUNCH_TOLERANCE_MINUTES || 5),
+  maxPunchDistanceMeters: Number(process.env.PUNCH_MAX_DISTANCE_METERS || 100),
   corsOrigins: (process.env.CORS_ORIGINS || "http://localhost:5173")
     .split(",")
     .map((item) => item.trim())
