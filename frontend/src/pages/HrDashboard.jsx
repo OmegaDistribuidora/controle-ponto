@@ -3,7 +3,7 @@ import AppShell from "../components/AppShell";
 import api from "../api";
 import { formatDateBr, formatDateTimeBr, resolveMediaUrl, statusClass, statusLabel } from "../utils";
 
-const pendingPollMs = Math.max(5000, Number(import.meta.env.VITE_PENDING_POLL_MS || 15000));
+const pendingPollMs = Math.max(5000, Number(import.meta.env.VITE_PENDING_POLL_MS || 10000));
 
 const toQuery = (filters) => {
   const params = new URLSearchParams();
@@ -20,9 +20,14 @@ const HrDashboard = () => {
   const [pending, setPending] = useState([]);
   const [records, setRecords] = useState([]);
   const [error, setError] = useState("");
+  const [pendingAttention, setPendingAttention] = useState(false);
   const [decisionMap, setDecisionMap] = useState({});
   const knownPendingIdsRef = useRef(new Set());
   const initializedPendingRef = useRef(false);
+  const originalTitleRef = useRef("");
+  const titleBlinkIntervalRef = useRef(null);
+  const titleBlinkTimeoutRef = useRef(null);
+  const panelPulseTimeoutRef = useRef(null);
   const [filters, setFilters] = useState({
     search: "",
     sectorId: "",
@@ -38,6 +43,44 @@ const HrDashboard = () => {
     setLookups(data);
   };
 
+  const stopTitleBlink = () => {
+    if (titleBlinkIntervalRef.current) {
+      window.clearInterval(titleBlinkIntervalRef.current);
+      titleBlinkIntervalRef.current = null;
+    }
+    if (titleBlinkTimeoutRef.current) {
+      window.clearTimeout(titleBlinkTimeoutRef.current);
+      titleBlinkTimeoutRef.current = null;
+    }
+    if (originalTitleRef.current) {
+      document.title = originalTitleRef.current;
+    }
+  };
+
+  const pulsePendingPanel = () => {
+    setPendingAttention(true);
+    if (panelPulseTimeoutRef.current) window.clearTimeout(panelPulseTimeoutRef.current);
+    panelPulseTimeoutRef.current = window.setTimeout(() => {
+      setPendingAttention(false);
+      panelPulseTimeoutRef.current = null;
+    }, 15000);
+  };
+
+  const blinkDocumentTitle = () => {
+    if (typeof document === "undefined") return;
+    if (!originalTitleRef.current) originalTitleRef.current = document.title || "Controle de Ponto";
+
+    stopTitleBlink();
+    let blinkOn = false;
+    titleBlinkIntervalRef.current = window.setInterval(() => {
+      blinkOn = !blinkOn;
+      document.title = blinkOn ? "ATENCAO: nova solicitacao pendente" : originalTitleRef.current;
+    }, 700);
+    titleBlinkTimeoutRef.current = window.setTimeout(() => {
+      stopTitleBlink();
+    }, 15000);
+  };
+
   const showNewPendingNotification = (newItems) => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
     if (Notification.permission !== "granted" || newItems.length === 0) return;
@@ -51,8 +94,19 @@ const HrDashboard = () => {
         ? `${newItems[0].user_name} - ${newItems[0].record_type} em ${formatDateBr(newItems[0].record_date)}`
         : "Acesse o painel para analisar as solicitações pendentes.";
 
-    // eslint-disable-next-line no-new
-    new Notification(title, { body });
+    const notification = new Notification(title, {
+      body,
+      requireInteraction: true,
+      renotify: true,
+      tag: "rh-pending-alert"
+    });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+
+    blinkDocumentTitle();
+    pulsePendingPanel();
   };
 
   const loadPending = async ({ notify = false } = {}) => {
@@ -86,6 +140,7 @@ const HrDashboard = () => {
   };
 
   useEffect(() => {
+    originalTitleRef.current = document.title || "Controle de Ponto";
     loadAll();
 
     const intervalId = window.setInterval(() => {
@@ -94,6 +149,7 @@ const HrDashboard = () => {
 
     const onVisible = () => {
       if (document.visibilityState === "visible") {
+        stopTitleBlink();
         loadPending({ notify: true }).catch(() => null);
       }
     };
@@ -102,6 +158,11 @@ const HrDashboard = () => {
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       window.clearInterval(intervalId);
+      stopTitleBlink();
+      if (panelPulseTimeoutRef.current) {
+        window.clearTimeout(panelPulseTimeoutRef.current);
+        panelPulseTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -133,7 +194,7 @@ const HrDashboard = () => {
     <AppShell>
       {error ? <p className="feedback status-denied">{error}</p> : null}
 
-      <section className="panel">
+      <section className={pendingAttention ? "panel pending-attention" : "panel"}>
         <div className="section-title-row">
           <h2>Solicitações de liberação</h2>
           <button className="ghost-btn" onClick={() => loadPending({ notify: false })}>
