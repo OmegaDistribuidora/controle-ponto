@@ -62,10 +62,6 @@ npm run dev
 
 ## Logins iniciais (padrao)
 
-Configuraveis via env no backend:
-- RH: usuario `rh`, senha `Carlos@123`
-- Admin: usuario `admin`, senha `Omega@123`
-
 Usuarios comuns criados pelo RH:
 - login = CPF
 - senha inicial = 3 primeiros digitos do CPF
