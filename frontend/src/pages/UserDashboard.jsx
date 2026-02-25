@@ -6,6 +6,8 @@ import { formatDateBr, formatDateTimeBr, resolveMediaUrl, statusClass, statusLab
 const UserDashboard = () => {
   const [profile, setProfile] = useState(null);
   const [records, setRecords] = useState([]);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -13,9 +15,19 @@ const UserDashboard = () => {
   const [passwordError, setPasswordError] = useState("");
 
   const loadData = async () => {
-    const [meRes, recordsRes] = await Promise.all([api.get("/auth/me"), api.get("/user/records?limit=50")]);
-    setProfile(meRes.data);
-    setRecords(recordsRes.data.items || []);
+    try {
+      setLoadError("");
+      setLoadingProfile(true);
+      const [meRes, recordsRes] = await Promise.all([api.get("/auth/me"), api.get("/user/records?limit=50")]);
+      setProfile(meRes.data);
+      setRecords(recordsRes.data.items || []);
+    } catch (error) {
+      setLoadError(error.response?.data?.error || "Erro ao carregar dados do usuario.");
+      setProfile(null);
+      setRecords([]);
+    } finally {
+      setLoadingProfile(false);
+    }
   };
 
   useEffect(() => {
@@ -40,6 +52,7 @@ const UserDashboard = () => {
 
   return (
     <AppShell>
+      {loadError ? <p className="feedback status-denied">{loadError}</p> : null}
       <section className="panel">
         <div className="section-title-row">
           <h2>Últimos 50 registros</h2>
@@ -113,8 +126,10 @@ const UserDashboard = () => {
               <strong>Empresa:</strong> {profile.company_name || "-"}
             </p>
           </div>
-        ) : (
+        ) : loadingProfile ? (
           <p>Carregando...</p>
+        ) : (
+          <p>Nao foi possivel carregar os dados do usuario.</p>
         )}
       </section>
     </AppShell>

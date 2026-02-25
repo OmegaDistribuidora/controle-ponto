@@ -53,7 +53,8 @@ const uploadToDrive = async ({ base64Image, fileName }) => {
       mimeType,
       body: Readable.from(buffer)
     },
-    fields: "id, webViewLink, webContentLink"
+    fields: "id, webViewLink, webContentLink",
+    timeout: config.drive.timeoutMs
   });
 
   const fileId = created.data.id;
@@ -61,7 +62,8 @@ const uploadToDrive = async ({ base64Image, fileName }) => {
 
   await drive.permissions.create({
     fileId,
-    requestBody: { role: "reader", type: "anyone" }
+    requestBody: { role: "reader", type: "anyone" },
+    timeout: config.drive.timeoutMs
   });
 
   return {
@@ -89,6 +91,8 @@ const uploadPunchPhoto = async ({ base64Image, cpf, recordType, recordDate }) =>
     try {
       return await uploadToDrive({ base64Image, fileName });
     } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Falha no upload para Google Drive, usando fallback local:", error?.message || error);
       return uploadToLocal({ base64Image, fileName });
     }
   }

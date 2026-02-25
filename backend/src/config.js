@@ -40,7 +40,8 @@ const config = {
     clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET || "",
     redirectUri: process.env.GOOGLE_DRIVE_REDIRECT_URI || "https://developers.google.com/oauthplayground",
     refreshToken: process.env.GOOGLE_DRIVE_REFRESH_TOKEN || "",
-    folderId: process.env.GOOGLE_DRIVE_FOLDER_ID || ""
+    folderId: process.env.GOOGLE_DRIVE_FOLDER_ID || "",
+    timeoutMs: Number(process.env.GOOGLE_DRIVE_TIMEOUT_MS || 15000)
   },
   seed: {
     rh: {
