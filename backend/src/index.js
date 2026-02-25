@@ -1,4 +1,3 @@
-const path = require("path");
 const cors = require("cors");
 const express = require("express");
 const { config } = require("./config");
@@ -20,7 +19,7 @@ app.use(
   })
 );
 app.use(express.json({ limit: "10mb" }));
-app.use("/uploads", express.static(path.resolve(process.cwd(), "backend", "uploads")));
+app.use("/uploads", express.static(config.uploadsDir));
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timezone: config.timezone });

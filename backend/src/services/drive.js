@@ -4,7 +4,7 @@ const { Readable } = require("stream");
 const { google } = require("googleapis");
 const { config } = require("../config");
 
-const uploadsDir = path.resolve(process.cwd(), "backend", "uploads");
+const uploadsDir = config.uploadsDir;
 
 const ensureUploadsDir = () => {
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });

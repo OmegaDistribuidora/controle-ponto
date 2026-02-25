@@ -16,6 +16,12 @@ const toBool = (value, defaultValue = false) => {
   return String(value).toLowerCase() === "true";
 };
 
+const resolveUploadsDir = () => {
+  const custom = process.env.UPLOADS_DIR;
+  if (!custom) return path.resolve(process.cwd(), "backend", "uploads");
+  return path.isAbsolute(custom) ? custom : path.resolve(process.cwd(), custom);
+};
+
 const config = {
   port: Number(process.env.PORT || 4000),
   jwtSecret: process.env.JWT_SECRET || "change-me-in-production",
@@ -35,6 +41,7 @@ const config = {
     password: process.env.DB_PASSWORD || "postgres",
     ssl: toBool(process.env.DB_SSL, false)
   },
+  uploadsDir: resolveUploadsDir(),
   drive: {
     clientId: process.env.GOOGLE_DRIVE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET || "",
