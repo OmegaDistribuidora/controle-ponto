@@ -17,19 +17,33 @@ export const formatCpfInput = (value) => {
 
 const isDateOnly = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
 
-const toSafeDate = (value) => {
+const toLocalDateFromIso = (isoDate) => {
+  const [year, month, day] = isoDate.split("-").map((item) => Number(item));
+  return new Date(year, month - 1, day, 0, 0, 0);
+};
+
+const extractIsoDatePrefix = (value) => {
+  const text = String(value || "").trim();
+  const match = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : "";
+};
+
+const toSafeDate = (value, { preferDateOnly = false } = {}) => {
   const text = String(value || "");
   if (!text) return null;
+  if (preferDateOnly) {
+    const isoDate = extractIsoDatePrefix(text);
+    if (isoDate) return toLocalDateFromIso(isoDate);
+  }
   if (isDateOnly(text)) {
-    const [year, month, day] = text.split("-").map((item) => Number(item));
-    return new Date(year, month - 1, day, 0, 0, 0);
+    return toLocalDateFromIso(text);
   }
   const parsed = new Date(text);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
 export const formatDateBr = (value) => {
-  const date = toSafeDate(value);
+  const date = toSafeDate(value, { preferDateOnly: true });
   if (!date) return "Data inválida";
   return date.toLocaleDateString("pt-BR", {
     timeZone: "America/Fortaleza"
