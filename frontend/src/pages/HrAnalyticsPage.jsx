@@ -11,7 +11,8 @@ const PERIOD_OPTIONS = [
 
 const VIEW_OPTIONS = [
   { key: "general", label: "Geral" },
-  { key: "user", label: "Por usuario" }
+  { key: "user", label: "Por usuario" },
+  { key: "sector", label: "Por setor" }
 ];
 
 const FORTALEZA_TZ = "America/Fortaleza";
@@ -118,6 +119,15 @@ const recordTone = (record) => {
   return record.outside_tolerance ? "bad" : "ok";
 };
 
+const metricFromRecords = (slice) => ({
+  total: slice.length,
+  entryOnTime: slice.filter((r) => r.record_type === "ENTRADA" && !r.outside_tolerance).length,
+  entryOut: slice.filter((r) => r.record_type === "ENTRADA" && r.outside_tolerance).length,
+  exitOnTime: slice.filter((r) => r.record_type === "SAIDA" && !r.outside_tolerance).length,
+  exitOut: slice.filter((r) => r.record_type === "SAIDA" && r.outside_tolerance).length,
+  pending: slice.filter((r) => r.status === "PENDENTE").length
+});
+
 const HrAnalyticsPage = () => {
   const [viewMode, setViewMode] = useState("general");
   const [period, setPeriod] = useState("week");
@@ -200,15 +210,6 @@ const HrAnalyticsPage = () => {
         rows
       };
     }
-
-    const metricFromRecords = (slice) => ({
-      total: slice.length,
-      entryOnTime: slice.filter((r) => r.record_type === "ENTRADA" && !r.outside_tolerance).length,
-      entryOut: slice.filter((r) => r.record_type === "ENTRADA" && r.outside_tolerance).length,
-      exitOnTime: slice.filter((r) => r.record_type === "SAIDA" && !r.outside_tolerance).length,
-      exitOut: slice.filter((r) => r.record_type === "SAIDA" && r.outside_tolerance).length,
-      pending: slice.filter((r) => r.status === "PENDENTE").length
-    });
 
     const headers = [
       "Pontos batidos",
@@ -295,7 +296,48 @@ const HrAnalyticsPage = () => {
     };
   }, [selectedUser, sectorsById, range.from, range.to, normalizedRecords]);
 
-  const activeTable = viewMode === "general" ? generalTable : userTable;
+  const sectorTable = useMemo(() => {
+    const headers = [
+      "Usuarios ativos",
+      "Pontos batidos",
+      "Entradas em ponto",
+      "Entradas fora de horario",
+      "Saidas em ponto",
+      "Saidas fora de horario",
+      "Pendentes"
+    ];
+
+    const rows = lookups.sectors.map((sector) => {
+      const sectorUsers = users.filter((user) => user.sector_id === sector.id);
+      const sectorUserIds = new Set(sectorUsers.map((user) => user.id));
+      const sectorRecords = normalizedRecords.filter((record) => sectorUserIds.has(record.user_id));
+      const metrics = metricFromRecords(sectorRecords);
+
+      return {
+        rowLabel: sector.name,
+        columns: [
+          mkCell(sectorUsers.length),
+          mkCell(metrics.total),
+          mkCell(metrics.entryOnTime, metrics.entryOnTime > 0 ? "ok" : ""),
+          mkCell(metrics.entryOut, metrics.entryOut > 0 ? "bad" : ""),
+          mkCell(metrics.exitOnTime, metrics.exitOnTime > 0 ? "ok" : ""),
+          mkCell(metrics.exitOut, metrics.exitOut > 0 ? "bad" : ""),
+          mkCell(metrics.pending, metrics.pending > 0 ? "bad" : "")
+        ]
+      };
+    });
+
+    return { headers, rows };
+  }, [lookups.sectors, normalizedRecords, users]);
+
+  const activeTable =
+    viewMode === "general" ? generalTable : viewMode === "user" ? userTable : sectorTable;
+  const firstColumnLabel =
+    viewMode === "general" && period === "today"
+      ? "Usuario"
+      : viewMode === "sector"
+        ? "Setor"
+        : "Periodo";
 
   return (
     <AppShell title="Paineis de Analise">
@@ -353,7 +395,7 @@ const HrAnalyticsPage = () => {
             <table className="analysis-table">
               <thead>
                 <tr>
-                  <th>{viewMode === "general" && period === "today" ? "Usuario" : "Periodo"}</th>
+                  <th>{firstColumnLabel}</th>
                   {activeTable.headers.map((header) => (
                     <th key={header}>{header}</th>
                   ))}
