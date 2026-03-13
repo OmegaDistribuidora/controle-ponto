@@ -132,6 +132,7 @@ const HrAnalyticsPage = () => {
   const [viewMode, setViewMode] = useState("general");
   const [period, setPeriod] = useState("week");
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedSectorId, setSelectedSectorId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [records, setRecords] = useState([]);
@@ -149,6 +150,11 @@ const HrAnalyticsPage = () => {
   const selectedUser = useMemo(
     () => users.find((item) => String(item.id) === String(selectedUserId)) || null,
     [users, selectedUserId]
+  );
+
+  const selectedSector = useMemo(
+    () => lookups.sectors.find((item) => String(item.id) === String(selectedSectorId)) || null,
+    [lookups.sectors, selectedSectorId]
   );
 
   const fetchBaseData = async () => {
@@ -186,6 +192,19 @@ const HrAnalyticsPage = () => {
       .catch((err) => setError(err.response?.data?.error || "Erro ao carregar dados de analise."))
       .finally(() => setLoading(false));
   }, [viewMode, period, selectedUserId]);
+
+  useEffect(() => {
+    if (viewMode !== "sector") return;
+    if (!lookups.sectors.length) {
+      setSelectedSectorId("");
+      return;
+    }
+
+    const hasSelectedSector = lookups.sectors.some((item) => String(item.id) === String(selectedSectorId));
+    if (!hasSelectedSector) {
+      setSelectedSectorId(String(lookups.sectors[0].id));
+    }
+  }, [lookups.sectors, selectedSectorId, viewMode]);
 
   const generalTable = useMemo(() => {
     if (period === "today") {
@@ -297,38 +316,57 @@ const HrAnalyticsPage = () => {
   }, [selectedUser, sectorsById, range.from, range.to, normalizedRecords]);
 
   const sectorTable = useMemo(() => {
-    const headers = [
-      "Usuarios ativos",
-      "Pontos batidos",
-      "Entradas em ponto",
-      "Entradas fora de horario",
-      "Saidas em ponto",
-      "Saidas fora de horario",
-      "Pendentes"
-    ];
+    const sectorUsers = users.filter((user) => String(user.sector_id) === String(selectedSectorId));
 
-    const rows = lookups.sectors.map((sector) => {
-      const sectorUsers = users.filter((user) => user.sector_id === sector.id);
-      const sectorUserIds = new Set(sectorUsers.map((user) => user.id));
-      const sectorRecords = normalizedRecords.filter((record) => sectorUserIds.has(record.user_id));
-      const metrics = metricFromRecords(sectorRecords);
-
+    if (period === "today") {
       return {
-        rowLabel: sector.name,
-        columns: [
-          mkCell(sectorUsers.length),
-          mkCell(metrics.total),
-          mkCell(metrics.entryOnTime, metrics.entryOnTime > 0 ? "ok" : ""),
-          mkCell(metrics.entryOut, metrics.entryOut > 0 ? "bad" : ""),
-          mkCell(metrics.exitOnTime, metrics.exitOnTime > 0 ? "ok" : ""),
-          mkCell(metrics.exitOut, metrics.exitOut > 0 ? "bad" : ""),
-          mkCell(metrics.pending, metrics.pending > 0 ? "bad" : "")
-        ]
-      };
-    });
+        headers: ["Entrada prevista", "Entrada registrada", "Saida prevista", "Saida registrada"],
+        rows: sectorUsers.map((user) => {
+          const userRecords = normalizedRecords.filter((item) => item.user_id === user.id);
+          const sector = sectorsById.get(user.sector_id);
+          const entry = userRecords.find((item) => item.record_type === "ENTRADA");
+          const exit = userRecords.find((item) => item.record_type === "SAIDA");
 
-    return { headers, rows };
-  }, [lookups.sectors, normalizedRecords, users]);
+          return {
+            rowLabel: `${user.name} (${user.cpf})`,
+            columns: [
+              mkCell(timeLabel(sector?.entry_time)),
+              mkCell(entry ? getRecordTime(entry.recorded_at) : "-", recordTone(entry)),
+              mkCell(timeLabel(sector?.exit_time)),
+              mkCell(exit ? getRecordTime(exit.recorded_at) : "-", recordTone(exit))
+            ]
+          };
+        })
+      };
+    }
+
+    return {
+      headers: [
+        "Pontos batidos",
+        "Entradas em ponto",
+        "Entradas fora de horario",
+        "Saidas em ponto",
+        "Saidas fora de horario",
+        "Pendentes"
+      ],
+      rows: sectorUsers.map((user) => {
+        const userRecords = normalizedRecords.filter((record) => record.user_id === user.id);
+        const metrics = metricFromRecords(userRecords);
+
+        return {
+          rowLabel: `${user.name} (${user.cpf})`,
+          columns: [
+            mkCell(metrics.total),
+            mkCell(metrics.entryOnTime, metrics.entryOnTime > 0 ? "ok" : ""),
+            mkCell(metrics.entryOut, metrics.entryOut > 0 ? "bad" : ""),
+            mkCell(metrics.exitOnTime, metrics.exitOnTime > 0 ? "ok" : ""),
+            mkCell(metrics.exitOut, metrics.exitOut > 0 ? "bad" : ""),
+            mkCell(metrics.pending, metrics.pending > 0 ? "bad" : "")
+          ]
+        };
+      })
+    };
+  }, [normalizedRecords, period, sectorsById, selectedSectorId, users]);
 
   const activeTable =
     viewMode === "general" ? generalTable : viewMode === "user" ? userTable : sectorTable;
@@ -336,7 +374,7 @@ const HrAnalyticsPage = () => {
     viewMode === "general" && period === "today"
       ? "Usuario"
       : viewMode === "sector"
-        ? "Setor"
+        ? "Usuario"
         : "Periodo";
 
   return (
@@ -391,6 +429,25 @@ const HrAnalyticsPage = () => {
             ) : null}
           </div>
 
+          {viewMode === "sector" ? (
+            <div className="analysis-sector-list">
+              {lookups.sectors.map((sector) => (
+                <button
+                  key={sector.id}
+                  type="button"
+                  className={
+                    String(sector.id) === String(selectedSectorId)
+                      ? "analysis-sector-btn active"
+                      : "analysis-sector-btn"
+                  }
+                  onClick={() => setSelectedSectorId(String(sector.id))}
+                >
+                  {sector.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
           <div className="analysis-table-wrap">
             <table className="analysis-table">
               <thead>
@@ -426,7 +483,9 @@ const HrAnalyticsPage = () => {
                     <td colSpan={activeTable.headers.length + 1}>
                       {viewMode === "user"
                         ? "Selecione um usuario para visualizar a analise detalhada."
-                        : "Sem dados para o periodo selecionado."}
+                        : viewMode === "sector" && selectedSector
+                          ? `Nenhum usuario ativo encontrado para o setor ${selectedSector.name}.`
+                          : "Sem dados para o periodo selecionado."}
                     </td>
                   </tr>
                 ) : null}

@@ -486,6 +486,23 @@ td {
   min-width: 280px;
 }
 
+.analysis-sector-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.analysis-sector-btn {
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.analysis-sector-btn.active {
+  border: 2px solid var(--primary);
+  background: #eaf6f4;
+}
+
 .analysis-table-wrap {
   overflow: auto;
 }
