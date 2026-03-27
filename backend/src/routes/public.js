@@ -65,15 +65,24 @@ router.post("/punch", async (req, res) => {
     if (!user.sector_id) {
       return res.status(400).json({ error: "Usuario sem setor vinculado. Procure o RH." });
     }
+    const sectorLatitude = user.sector_latitude;
+    const sectorLongitude = user.sector_longitude;
     const hasSectorCoordinates =
-      Number.isFinite(Number(user.sector_latitude)) && Number.isFinite(Number(user.sector_longitude));
+      sectorLatitude !== null &&
+      sectorLatitude !== undefined &&
+      sectorLatitude !== "" &&
+      sectorLongitude !== null &&
+      sectorLongitude !== undefined &&
+      sectorLongitude !== "" &&
+      Number.isFinite(Number(sectorLatitude)) &&
+      Number.isFinite(Number(sectorLongitude));
 
     if (hasSectorCoordinates) {
       const sectorDistance = distanceMeters({
         fromLat: latitude,
         fromLon: longitude,
-        toLat: Number(user.sector_latitude),
-        toLon: Number(user.sector_longitude)
+        toLat: Number(sectorLatitude),
+        toLon: Number(sectorLongitude)
       });
       if (sectorDistance > config.maxPunchDistanceMeters) {
         return res.status(403).json({
