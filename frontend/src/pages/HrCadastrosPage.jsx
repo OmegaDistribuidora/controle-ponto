@@ -691,7 +691,6 @@ const HrCadastrosPage = () => {
                     step="any"
                     value={editSector.latitude}
                     onChange={(e) => setEditSector((prev) => ({ ...prev, latitude: e.target.value }))}
-                    required
                   />
                 </label>
                 <label>
@@ -702,9 +701,11 @@ const HrCadastrosPage = () => {
                     step="any"
                     value={editSector.longitude}
                     onChange={(e) => setEditSector((prev) => ({ ...prev, longitude: e.target.value }))}
-                    required
                   />
                 </label>
+                <p className="muted small">
+                  Deixe latitude e longitude vazias para remover a restricao de localizacao deste setor.
+                </p>
                 <div className="modal-actions">
                   <button type="button" className="ghost-btn" onClick={closeModal}>
                     Cancelar

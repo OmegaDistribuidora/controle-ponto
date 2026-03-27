@@ -34,6 +34,39 @@ const parseCoordinate = (value, { min, max, label }) => {
   return { ok: true, value: parsed };
 };
 
+const parseOptionalCoordinates = ({ latitude, longitude }) => {
+  const latitudeText = String(latitude ?? "").trim();
+  const longitudeText = String(longitude ?? "").trim();
+
+  if (!latitudeText && !longitudeText) {
+    return { ok: true, latitude: null, longitude: null };
+  }
+
+  if (!latitudeText || !longitudeText) {
+    return { ok: false, error: "Latitude e longitude devem ser informadas juntas ou deixadas vazias." };
+  }
+
+  const parsedLatitude = parseCoordinate(latitudeText, {
+    min: -90,
+    max: 90,
+    label: "Latitude"
+  });
+  if (!parsedLatitude.ok) return { ok: false, error: parsedLatitude.error };
+
+  const parsedLongitude = parseCoordinate(longitudeText, {
+    min: -180,
+    max: 180,
+    label: "Longitude"
+  });
+  if (!parsedLongitude.ok) return { ok: false, error: parsedLongitude.error };
+
+  return {
+    ok: true,
+    latitude: parsedLatitude.value,
+    longitude: parsedLongitude.value
+  };
+};
+
 const buildRecordFilter = ({ query, includePendingOnly = false }) => {
   const where = [];
   const values = [];
@@ -374,23 +407,16 @@ router.put("/sectors/:id", async (req, res) => {
     const name = String(req.body?.name || "").trim();
     const entryTime = String(req.body?.entryTime || "").trim();
     const exitTime = String(req.body?.exitTime || "").trim();
-    const latitude = parseCoordinate(req.body?.latitude, {
-      min: -90,
-      max: 90,
-      label: "Latitude"
-    });
-    const longitude = parseCoordinate(req.body?.longitude, {
-      min: -180,
-      max: 180,
-      label: "Longitude"
+    const coordinates = parseOptionalCoordinates({
+      latitude: req.body?.latitude,
+      longitude: req.body?.longitude
     });
     if (!id || !name || !entryTime || !exitTime) {
       return res
         .status(400)
-        .json({ error: "Nome, horario de entrada, saida, latitude e longitude sao obrigatorios." });
+        .json({ error: "Nome, horario de entrada e saida sao obrigatorios." });
     }
-    if (!latitude.ok) return res.status(400).json({ error: latitude.error });
-    if (!longitude.ok) return res.status(400).json({ error: longitude.error });
+    if (!coordinates.ok) return res.status(400).json({ error: coordinates.error });
     const result = await pool.query(
       `
         UPDATE sectors
@@ -398,7 +424,7 @@ router.put("/sectors/:id", async (req, res) => {
         WHERE id = $6
         RETURNING id, name, entry_time, exit_time, latitude, longitude
       `,
-      [name, entryTime, exitTime, latitude.value, longitude.value, id]
+      [name, entryTime, exitTime, coordinates.latitude, coordinates.longitude, id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: "Setor nao encontrado." });
     return res.json({ item: result.rows[0] });
