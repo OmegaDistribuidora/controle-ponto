@@ -65,24 +65,23 @@ router.post("/punch", async (req, res) => {
     if (!user.sector_id) {
       return res.status(400).json({ error: "Usuario sem setor vinculado. Procure o RH." });
     }
-    if (!Number.isFinite(Number(user.sector_latitude)) || !Number.isFinite(Number(user.sector_longitude))) {
-      return res
-        .status(400)
-        .json({ error: "Setor sem coordenadas de localizacao. Procure o RH para configurar." });
-    }
+    const hasSectorCoordinates =
+      Number.isFinite(Number(user.sector_latitude)) && Number.isFinite(Number(user.sector_longitude));
 
-    const sectorDistance = distanceMeters({
-      fromLat: latitude,
-      fromLon: longitude,
-      toLat: Number(user.sector_latitude),
-      toLon: Number(user.sector_longitude)
-    });
-    if (sectorDistance > config.maxPunchDistanceMeters) {
-      return res.status(403).json({
-        error: `Fora da area permitida para este setor. Distancia atual: ${Math.round(
-          sectorDistance
-        )}m (limite ${config.maxPunchDistanceMeters}m).`
+    if (hasSectorCoordinates) {
+      const sectorDistance = distanceMeters({
+        fromLat: latitude,
+        fromLon: longitude,
+        toLat: Number(user.sector_latitude),
+        toLon: Number(user.sector_longitude)
       });
+      if (sectorDistance > config.maxPunchDistanceMeters) {
+        return res.status(403).json({
+          error: `Fora da area permitida para este setor. Distancia atual: ${Math.round(
+            sectorDistance
+          )}m (limite ${config.maxPunchDistanceMeters}m).`
+        });
+      }
     }
 
     const now = nowInFortaleza();
